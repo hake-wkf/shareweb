@@ -1,7 +1,7 @@
 export type DeviceOnlineStatus = '在线' | '离线';
 export type SwitchState = '开' | '关';
 export type DevicePurpose = '普通设备' | '计费设备' | '门禁设备' | '照明控制' | '音响播控';
-export type DeviceTestMode = 'switch' | 'lock' | 'none';
+export type DeviceTestMode = 'switch' | 'lock' | 'gzdls7' | 'none';
 
 export interface DeviceRecord {
   id: string;
@@ -23,7 +23,13 @@ export interface DeviceRecord {
   volume: number | null; // 0-100 or null if not audio device
   signalStrength: number; // e.g., -44, -56, 0
   lastSignalQueryTime: string;
+  // Mini-program metadata
+  sortOrder: number;
+  enabled: boolean;
+  roomCategory: string;
 }
+
+export type PlatformMode = 'web' | 'miniapp';
 
 export interface DeviceFilterState {
   franchisee: string;
@@ -60,3 +66,55 @@ export interface RoomRecord {
 }
 
 export type WorkspaceTabKey = 'gateways' | 'devices' | 'rooms';
+
+// GZDLS7 specialized types
+export type Gzdls7PanelTab =
+  | 'personnel'
+  | 'info'
+  | 'attendance'
+  | 'text'
+  | 'image'
+  | 'audio';
+
+export type QuickCoordinateKey =
+  | 'top-left'
+  | 'top-right'
+  | 'center'
+  | 'bottom-left'
+  | 'bottom-right';
+
+export interface Gzdls7DeviceInfo {
+  model: string;
+  firmwareVersion: string;
+  deviceIp: string;
+  userCount: number;
+  attendanceCount: number;
+  faceCount: number;
+}
+
+export interface Gzdls7Personnel {
+  id: string;
+  name: string;
+  employeeNo: string;
+  faceEnrolled: boolean;
+  faceId: string | null;
+  faceEnrolledAt: string | null;
+  faceQuality: number | null;
+  faceQueried: boolean;
+}
+
+export interface Gzdls7AttendanceRecord {
+  id: string;
+  name: string;
+  employeeNo: string;
+  checkInTime: string;
+}
+
+export interface Gzdls7AudioFile {
+  id: string;
+  name: string;
+  fileName: string;
+  sizeText: string;
+  durationSec: number;
+  uploadedAt: string;
+}

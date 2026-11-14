@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Check,
+  Clock,
   Copy,
+  Cpu,
+  Image as ImageIcon,
   Inbox,
   MoreHorizontal,
   Trash2,
+  Type,
+  Users,
+  Volume2,
 } from 'lucide-react';
-import { DeviceRecord } from '../types/device';
+import { DeviceRecord, Gzdls7PanelTab } from '../types/device';
 
 interface DeviceTableProps {
   devices: DeviceRecord[];
@@ -21,10 +28,27 @@ interface DeviceTableProps {
   onResetFilters: () => void;
   onOpenPurpose: (device: DeviceRecord) => void;
   onOpenCommand: (device: DeviceRecord) => void;
-  onDeviceTest: (device: DeviceRecord, action: '开启' | '关闭' | '开锁' | '关锁') => void;
+  onDeviceTest: (
+    device: DeviceRecord,
+    action: '开启' | '关闭' | '开锁' | '关锁' | '开门'
+  ) => void;
+  onOpenGzdls7Panel: (device: DeviceRecord, tab: Gzdls7PanelTab) => void;
   onOpenMore: (device: DeviceRecord) => void;
   onRequestDelete: (device: DeviceRecord) => void;
 }
+
+const GZDLS7_MENU_ITEMS: {
+  tab: Gzdls7PanelTab;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
+  { tab: 'personnel', label: '设备人员列表', icon: <Users className="w-3.5 h-3.5 text-slate-500" /> },
+  { tab: 'info', label: '设备信息', icon: <Cpu className="w-3.5 h-3.5 text-slate-500" /> },
+  { tab: 'attendance', label: '获取打卡记录', icon: <Clock className="w-3.5 h-3.5 text-slate-500" /> },
+  { tab: 'text', label: '下方显示文字', icon: <Type className="w-3.5 h-3.5 text-slate-500" /> },
+  { tab: 'image', label: '下方显示图片', icon: <ImageIcon className="w-3.5 h-3.5 text-slate-500" /> },
+  { tab: 'audio', label: '设置音频文件', icon: <Volume2 className="w-3.5 h-3.5 text-slate-500" /> },
+];
 
 export const DeviceTable: React.FC<DeviceTableProps> = ({
   devices,
@@ -38,11 +62,28 @@ export const DeviceTable: React.FC<DeviceTableProps> = ({
   onOpenPurpose,
   onOpenCommand,
   onDeviceTest,
+  onOpenGzdls7Panel,
   onOpenMore,
   onRequestDelete,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [jumpInput, setJumpInput] = useState('');
+  const [openMenu, setOpenMenu] = useState<{
+    device: DeviceRecord;
+    top: number;
+    left: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    const handleClose = () => setOpenMenu(null);
+    window.addEventListener('click', handleClose);
+    window.addEventListener('scroll', handleClose, true);
+    return () => {
+      window.removeEventListener('click', handleClose);
+      window.removeEventListener('scroll', handleClose, true);
+    };
+  }, [openMenu]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
@@ -108,7 +149,7 @@ export const DeviceTable: React.FC<DeviceTableProps> = ({
               <th className="py-3 px-3.5 text-center whitespace-nowrap w-[108px]">
                 指令操作
               </th>
-              <th className="py-3 px-3.5 text-center whitespace-nowrap w-[144px]">
+              <th className="py-3 px-3.5 text-center whitespace-nowrap w-[172px]">
                 设备测试
               </th>
               <th className="py-3 px-3.5 text-center whitespace-nowrap w-[148px]">
@@ -286,6 +327,44 @@ export const DeviceTable: React.FC<DeviceTableProps> = ({
                           </button>
                         </div>
                       )}
+                      {row.testMode === 'gzdls7' && (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onDeviceTest(row, '开门')}
+                            className="h-7 px-2.5 text-[12px] font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                          >
+                            开门
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (openMenu?.device.id === row.id) {
+                                setOpenMenu(null);
+                                return;
+                              }
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const menuHeight = 236;
+                              const spaceBelow = window.innerHeight - rect.bottom;
+                              const top =
+                                spaceBelow < menuHeight
+                                  ? Math.max(8, rect.top - menuHeight - 4)
+                                  : rect.bottom + 4;
+                              const left = Math.min(
+                                window.innerWidth - 168,
+                                Math.max(8, rect.right - 156)
+                              );
+                              setOpenMenu({ device: row, top, left });
+                            }}
+                            aria-expanded={openMenu?.device.id === row.id}
+                            className="inline-flex items-center gap-1 h-7 px-2.5 text-[12px] font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                          >
+                            更多操作
+                            <ChevronDown className="w-3 h-3 text-slate-500" />
+                          </button>
+                        </div>
+                      )}
                       {row.testMode === 'none' && (
                         <span className="text-slate-300 select-none">—</span>
                       )}
@@ -400,6 +479,33 @@ export const DeviceTable: React.FC<DeviceTableProps> = ({
           </form>
         </div>
       </div>
+
+      {/* Collapsible GZDLS7 "更多操作" Dropdown Menu */}
+      {openMenu && (
+        <div
+          style={{ top: openMenu.top, left: openMenu.left }}
+          onClick={(e) => e.stopPropagation()}
+          className="fixed z-50 w-[156px] bg-white border border-slate-200 rounded-lg shadow-lg py-1"
+          role="menu"
+        >
+          {GZDLS7_MENU_ITEMS.map((item) => (
+            <button
+              key={item.tab}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const target = openMenu.device;
+                setOpenMenu(null);
+                onOpenGzdls7Panel(target, item.tab);
+              }}
+              className="w-full px-3 py-2 text-left text-[12.5px] font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors cursor-pointer"
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   );
 };
