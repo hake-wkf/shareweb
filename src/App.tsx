@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CheckCircle2, Monitor, RefreshCw, Smartphone, X } from 'lucide-react';
 import {
+  AreaEventRecord,
   DeviceFilterState,
   DevicePurpose,
   DeviceRecord,
@@ -13,6 +14,7 @@ import {
   INITIAL_GATEWAYS,
   INITIAL_ROOMS,
 } from './data/mockDevices';
+import { INITIAL_AREA_EVENTS } from './data/areaEventsData';
 import { FilterBar } from './components/FilterBar';
 import { DeviceTable } from './components/DeviceTable';
 import { DeviceMoreDrawer } from './components/DeviceMoreDrawer';
@@ -25,6 +27,8 @@ import {
   DevicePurposeModal,
 } from './components/DeviceModals';
 import { GatewaysView, RoomsView } from './components/GatewayAndRoomViews';
+import { AreaEventsView } from './components/AreaEventsView';
+import { AreaEventModal } from './components/AreaEventModal';
 
 const EMPTY_FILTER: DeviceFilterState = {
   franchisee: '',
@@ -46,6 +50,7 @@ const TABS: { key: WorkspaceTabKey; label: string }[] = [
   { key: 'gateways', label: '网关列表' },
   { key: 'devices', label: '设备列表' },
   { key: 'rooms', label: '包间列表' },
+  { key: 'events', label: '区域事件' },
 ];
 
 export default function App() {
@@ -55,6 +60,7 @@ export default function App() {
     'gateways',
     'devices',
     'rooms',
+    'events',
   ]);
 
   const [devices, setDevices] = useState<DeviceRecord[]>(INITIAL_DEVICES);
@@ -75,6 +81,12 @@ export default function App() {
   const [purposeDevice, setPurposeDevice] = useState<DeviceRecord | null>(null);
   const [commandDevice, setCommandDevice] = useState<DeviceRecord | null>(null);
   const [deleteDevice, setDeleteDevice] = useState<DeviceRecord | null>(null);
+
+  const [areaEvents, setAreaEvents] =
+    useState<AreaEventRecord[]>(INITIAL_AREA_EVENTS);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [editingAreaEvent, setEditingAreaEvent] =
+    useState<AreaEventRecord | null>(null);
 
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
@@ -262,6 +274,29 @@ export default function App() {
       setMoreDeviceId(null);
     }
     showToast(`已移除设备「${target?.deviceName ?? ''}」`);
+  };
+
+  const handleSaveAreaEvent = (nextEvent: AreaEventRecord) => {
+    setAreaEvents((prev) => {
+      const exists = prev.some((e) => e.id === nextEvent.id);
+      if (exists) {
+        return prev.map((e) => (e.id === nextEvent.id ? nextEvent : e));
+      }
+      return [nextEvent, ...prev];
+    });
+    showToast(`已保存区域事件「${nextEvent.eventName}」`);
+  };
+
+  const handleDeleteAreaEvent = (eventId: string) => {
+    const target = areaEvents.find((e) => e.id === eventId);
+    setAreaEvents((prev) => prev.filter((e) => e.id !== eventId));
+    showToast(`已删除区域事件「${target?.eventName ?? ''}」`);
+  };
+
+  const handleRefreshAreaEvents = () => {
+    triggerBriefLoad(() => {
+      showToast('区域事件列表已刷新');
+    });
   };
 
   const formatNow = () => {
@@ -534,6 +569,23 @@ export default function App() {
                 onFilterDevicesByRoom={handleJumpFromRoom}
               />
             )}
+
+            {activeTab === 'events' && (
+              <AreaEventsView
+                events={areaEvents}
+                isRefreshing={isLoading}
+                onRefresh={handleRefreshAreaEvents}
+                onAddEvent={() => {
+                  setEditingAreaEvent(null);
+                  setIsEventModalOpen(true);
+                }}
+                onEditEvent={(evt) => {
+                  setEditingAreaEvent(evt);
+                  setIsEventModalOpen(true);
+                }}
+                onDeleteEvent={handleDeleteAreaEvent}
+              />
+            )}
           </>
         )}
       </main>
@@ -563,6 +615,18 @@ export default function App() {
         onClose={() => setGzdls7Drawer(null)}
         onSendOpenDoor={(d) => handleDeviceTest(d, '开门')}
         onNotify={showToast}
+      />
+
+      {/* Area Event Add / Edit Modal */}
+      <AreaEventModal
+        isOpen={isEventModalOpen}
+        editingEvent={editingAreaEvent}
+        devices={devices}
+        onClose={() => {
+          setIsEventModalOpen(false);
+          setEditingAreaEvent(null);
+        }}
+        onSave={handleSaveAreaEvent}
       />
 
       {/* Action Modals */}

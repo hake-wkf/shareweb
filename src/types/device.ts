@@ -65,7 +65,7 @@ export interface RoomRecord {
   roomStatus: '使用中' | '空闲' | '维护中';
 }
 
-export type WorkspaceTabKey = 'gateways' | 'devices' | 'rooms';
+export type WorkspaceTabKey = 'gateways' | 'devices' | 'rooms' | 'events';
 
 // GZDLS7 specialized types
 export type Gzdls7PanelTab =
@@ -117,4 +117,86 @@ export interface Gzdls7AudioFile {
   sizeText: string;
   durationSec: number;
   uploadedAt: string;
+}
+
+// Area Event Management types
+export type AreaEventTriggerType =
+  | 'any_order_active'
+  | 'no_orders'
+  | 'gym_face_open'
+  | 'ab_door_linkage';
+
+export type AreaEventDeviceActionType =
+  | 'open_door'
+  | 'display_text'
+  | 'display_image'
+  | 'play_audio'
+  | 'turn_on'
+  | 'turn_off'
+  | 'unlock'
+  | 'lock'
+  | 'set_volume';
+
+export type AbIconMatchMode = 'all' | 'specific';
+export type AbTextSourceMode = 'ab_text' | 'custom';
+export type ImageSourceMode = 'order_user_avatar' | 'preset_or_upload';
+
+export interface AbDoorDeviceOption {
+  id: string;
+  sn: string;
+  name: string;
+  areaName: string;
+}
+
+export interface AreaEventActionConfig {
+  id: string;
+  roomName: string;
+  deviceId: string;
+  deviceName: string;
+  deviceModel: string;
+  deviceSn: string;
+  actionType: AreaEventDeviceActionType | '';
+  delaySeconds: number;
+  // GZDLS7 display_text config
+  textContent: string;
+  textPreset: QuickCoordinateKey | 'custom';
+  textX: number;
+  textY: number;
+  textColor: string;
+  textFontSize: number;
+  textPersistMode: 'always' | 'seconds';
+  textDurationSec: number;
+  // GZDLS7 display_image config
+  imageSourceMode: ImageSourceMode;
+  imageName: string;
+  imageUrl: string;
+  imagePreset: QuickCoordinateKey | 'custom';
+  imageX: number;
+  imageY: number;
+  imagePersistMode: 'always' | 'seconds';
+  imageDurationSec: number;
+  // GZDLS7 play_audio config
+  audioFileName: string;
+  audioDisplayName: string;
+  audioVolume: number;
+  // AB door linkage config
+  abIconMatchMode: AbIconMatchMode;
+  abIconIdValue: string;
+  abTextSourceMode: AbTextSourceMode;
+  // Non-GZDLS7 optional volume
+  deviceVolume?: number;
+}
+
+export interface AreaEventRecord {
+  id: string;
+  eventName: string;
+  areaName: string;
+  triggerType: AreaEventTriggerType;
+  triggerDeviceSn?: string;
+  abDoorDeviceId?: string;
+  abDoorDeviceSn?: string;
+  abDoorDeviceName?: string;
+  abCommand?: 'ABReport';
+  actions: AreaEventActionConfig[];
+  updatedAt: string;
 }
