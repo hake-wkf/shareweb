@@ -392,7 +392,7 @@ export default function App() {
 
   const currentTabLabel =
     platform === 'miniapp'
-      ? '小程序后台 · 设备列表'
+      ? '小程序后台'
       : TABS.find((t) => t.key === activeTab)?.label ?? '设备列表';
 
   return (
@@ -519,6 +519,10 @@ export default function App() {
             onDeviceTest={handleDeviceTest}
             onOpenEditMore={(d) => setMiniProgramEditId(d.id)}
             onNotify={showToast}
+            areaEvents={areaEvents}
+            onSaveAreaEvent={handleSaveAreaEvent}
+            onDeleteAreaEvent={handleDeleteAreaEvent}
+            onRefreshAreaEvents={handleRefreshAreaEvents}
           />
         ) : (
           <>

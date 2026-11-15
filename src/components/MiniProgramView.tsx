@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import {
+  CalendarClock,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Cpu,
   DoorOpen,
   Inbox,
   Lightbulb,
@@ -13,9 +15,15 @@ import {
   SlidersHorizontal,
   Volume2,
 } from 'lucide-react';
-import { DeviceFilterState, DeviceRecord } from '../types/device';
+import {
+  AreaEventRecord,
+  DeviceFilterState,
+  DeviceRecord,
+} from '../types/device';
 import { FRANCHISEE_OPTIONS } from '../data/mockDevices';
 import { MiniProgramGzdls7View } from './MiniProgramGzdls7View';
+import { MiniProgramAreaEventsView } from './MiniProgramAreaEventsView';
+import { MiniProgramAreaEventForm } from './MiniProgramAreaEventForm';
 
 interface MiniProgramViewProps {
   devices: DeviceRecord[];
@@ -30,6 +38,10 @@ interface MiniProgramViewProps {
   ) => void;
   onOpenEditMore: (device: DeviceRecord) => void;
   onNotify: (message: string) => void;
+  areaEvents: AreaEventRecord[];
+  onSaveAreaEvent: (event: AreaEventRecord) => void;
+  onDeleteAreaEvent: (eventId: string) => void;
+  onRefreshAreaEvents: () => void;
 }
 
 function renderDeviceIcon(device: DeviceRecord) {
@@ -71,7 +83,12 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
   onDeviceTest,
   onOpenEditMore,
   onNotify,
+  areaEvents,
+  onSaveAreaEvent,
+  onDeleteAreaEvent,
+  onRefreshAreaEvents,
 }) => {
+  const [appSection, setAppSection] = useState<'devices' | 'events'>('devices');
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [selectedStore, setSelectedStore] = useState<string>('全部门店');
   const [selectedCategory, setSelectedCategory] = useState<string>('全部包间');
@@ -80,6 +97,11 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
 
   // In-app single subpage for GZDLS7 specialized controls
   const [activeGzdls7Id, setActiveGzdls7Id] = useState<string | null>(null);
+  // In-app subpage for Area Event Add / Edit
+  const [eventFormState, setEventFormState] = useState<{
+    open: boolean;
+    editing: AreaEventRecord | null;
+  }>({ open: false, editing: null });
 
   const activeGzdls7Device = useMemo(
     () => devices.find((d) => d.id === activeGzdls7Id) ?? null,
@@ -192,6 +214,17 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
                 <ChevronLeft className="w-4 h-4" />
                 返回
               </button>
+            ) : eventFormState.open ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setEventFormState({ open: false, editing: null })
+                }
+                className="inline-flex items-center gap-0.5 text-[13px] font-medium text-white hover:text-emerald-100 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                返回
+              </button>
             ) : (
               <span className="text-[12px] text-emerald-100 whitespace-nowrap">
                 小程序
@@ -200,24 +233,62 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
           </div>
 
           <h1 className="text-[15px] font-semibold tracking-tight truncate text-center">
-            {activeGzdls7Device ? 'GZDLS7 操作' : '设备列表'}
+            {activeGzdls7Device
+              ? 'GZDLS7 操作'
+              : eventFormState.open
+              ? eventFormState.editing
+                ? '编辑区域事件'
+                : '新增区域事件'
+              : appSection === 'events'
+              ? '区域事件'
+              : '设备列表'}
           </h1>
 
           <div className="w-16 flex items-center justify-end">
-            {!activeGzdls7Device && (
+            {!activeGzdls7Device && !eventFormState.open && (
               <span className="text-[12px] font-mono-tabular text-emerald-100 whitespace-nowrap">
-                {filteredCards.length}台
+                {appSection === 'events'
+                  ? `${areaEvents.length}条`
+                  : `${filteredCards.length}台`}
               </span>
             )}
           </div>
         </div>
 
-        {/* Subpage: GZDLS7 Controls OR Main App Device List */}
+        {/* Subpage: GZDLS7 Controls OR Area Event Form OR Main App Sections */}
         {activeGzdls7Device ? (
           <div className="flex-1 overflow-y-auto">
             <MiniProgramGzdls7View
               device={activeGzdls7Device}
               onNotify={onNotify}
+            />
+          </div>
+        ) : eventFormState.open ? (
+          <div className="flex-1 overflow-y-auto flex flex-col">
+            <MiniProgramAreaEventForm
+              editingEvent={eventFormState.editing}
+              devices={devices}
+              onCancel={() =>
+                setEventFormState({ open: false, editing: null })
+              }
+              onSave={(saved) => {
+                onSaveAreaEvent(saved);
+                setEventFormState({ open: false, editing: null });
+              }}
+            />
+          </div>
+        ) : appSection === 'events' ? (
+          <div className="flex-1 overflow-y-auto">
+            <MiniProgramAreaEventsView
+              events={areaEvents}
+              onRefresh={onRefreshAreaEvents}
+              onAddEvent={() =>
+                setEventFormState({ open: true, editing: null })
+              }
+              onEditEvent={(evt) =>
+                setEventFormState({ open: true, editing: evt })
+              }
+              onDeleteEvent={onDeleteAreaEvent}
             />
           </div>
         ) : (
@@ -592,6 +663,39 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
               </div>
             )}
           </div>
+        )}
+
+        {/* Native App Bottom Tab Bar (Shown on top-level App screens) */}
+        {!activeGzdls7Device && !eventFormState.open && (
+          <nav
+            aria-label="小程序底部导航"
+            className="bg-white border-t border-slate-200 grid grid-cols-2 h-13 shrink-0"
+          >
+            <button
+              type="button"
+              onClick={() => setAppSection('devices')}
+              className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer ${
+                appSection === 'devices'
+                  ? 'text-[#4B996E]'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Cpu className="w-4 h-4" />
+              <span>设备列表</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAppSection('events')}
+              className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer ${
+                appSection === 'events'
+                  ? 'text-[#4B996E]'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <CalendarClock className="w-4 h-4" />
+              <span>区域事件</span>
+            </button>
+          </nav>
         )}
       </div>
     </div>
