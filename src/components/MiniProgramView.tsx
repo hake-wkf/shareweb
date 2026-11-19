@@ -5,9 +5,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Cpu,
+  Disc3,
   DoorOpen,
   Inbox,
   Lightbulb,
+  ListChecks,
   Lock,
   RotateCcw,
   ScanFace,
@@ -19,11 +21,16 @@ import {
   AreaEventRecord,
   DeviceFilterState,
   DeviceRecord,
+  Gzirb56Config,
+  RoomEventDeviceAction,
+  RoomEventItem,
 } from '../types/device';
 import { FRANCHISEE_OPTIONS } from '../data/mockDevices';
 import { MiniProgramGzdls7View } from './MiniProgramGzdls7View';
+import { MiniProgramGzirb56View } from './MiniProgramGzirb56View';
 import { MiniProgramAreaEventsView } from './MiniProgramAreaEventsView';
 import { MiniProgramAreaEventForm } from './MiniProgramAreaEventForm';
+import { MiniProgramRoomEventsView } from './MiniProgramRoomEventsView';
 
 interface MiniProgramViewProps {
   devices: DeviceRecord[];
@@ -42,6 +49,31 @@ interface MiniProgramViewProps {
   onSaveAreaEvent: (event: AreaEventRecord) => void;
   onDeleteAreaEvent: (eventId: string) => void;
   onRefreshAreaEvents: () => void;
+  gzirb56Configs?: Record<string, Gzirb56Config>;
+  onUpdateGzirb56Config?: (deviceId: string, next: Gzirb56Config) => void;
+  // Room Events (事件管理)
+  roomEvents: RoomEventItem[];
+  roomEventOptions: string[];
+  selectedRoomForEvents: string;
+  onSelectRoomForEvents: (roomName: string) => void;
+  onRefreshRoomEvents: () => void;
+  onInitRoomEvents: (roomName: string) => void;
+  onAddRoomEvent: (payload: {
+    roomName: string;
+    eventKey: string;
+    eventName: string;
+    triggerCondition: string;
+  }) => void;
+  onDeleteRoomEvent: (eventId: string) => void;
+  onSaveRoomEventAction: (
+    eventId: string,
+    action: RoomEventDeviceAction
+  ) => void;
+  onDeleteRoomEventAction: (eventId: string, actionId: string) => void;
+  onReorderRoomEventActions: (
+    eventId: string,
+    nextActions: RoomEventDeviceAction[]
+  ) => void;
 }
 
 function renderDeviceIcon(device: DeviceRecord) {
@@ -49,6 +81,13 @@ function renderDeviceIcon(device: DeviceRecord) {
     return (
       <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#4B996E] shrink-0">
         <ScanFace className="w-4 h-4" />
+      </div>
+    );
+  }
+  if (device.model === 'GZIRB56') {
+    return (
+      <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shrink-0">
+        <Disc3 className="w-4 h-4" />
       </div>
     );
   }
@@ -87,25 +126,60 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
   onSaveAreaEvent,
   onDeleteAreaEvent,
   onRefreshAreaEvents,
+  gzirb56Configs,
+  onUpdateGzirb56Config,
+  roomEvents,
+  roomEventOptions,
+  selectedRoomForEvents,
+  onSelectRoomForEvents,
+  onRefreshRoomEvents,
+  onInitRoomEvents,
+  onAddRoomEvent,
+  onDeleteRoomEvent,
+  onSaveRoomEventAction,
+  onDeleteRoomEventAction,
+  onReorderRoomEventActions,
 }) => {
-  const [appSection, setAppSection] = useState<'devices' | 'events'>('devices');
+  const [appSection, setAppSection] = useState<
+    'devices' | 'events' | 'roomEvents'
+  >('devices');
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [selectedStore, setSelectedStore] = useState<string>('全部门店');
   const [selectedCategory, setSelectedCategory] = useState<string>('全部包间');
   const [page, setPage] = useState(1);
   const pageSize = 8;
 
-  // In-app single subpage for GZDLS7 specialized controls
+  // In-app single subpages for GZDLS7 & GZIRB56 specialized controls
   const [activeGzdls7Id, setActiveGzdls7Id] = useState<string | null>(null);
+  const [activeGzirb56Id, setActiveGzirb56Id] = useState<string | null>(null);
   // In-app subpage for Area Event Add / Edit
   const [eventFormState, setEventFormState] = useState<{
     open: boolean;
     editing: AreaEventRecord | null;
   }>({ open: false, editing: null });
+  // In-app Level 2 subpage for Room Event Actions (图二)
+  const [activeRoomEventId, setActiveRoomEventId] = useState<string | null>(
+    null
+  );
 
   const activeGzdls7Device = useMemo(
     () => devices.find((d) => d.id === activeGzdls7Id) ?? null,
     [devices, activeGzdls7Id]
+  );
+
+  const activeGzirb56Device = useMemo(
+    () => devices.find((d) => d.id === activeGzirb56Id) ?? null,
+    [devices, activeGzirb56Id]
+  );
+
+  const activeRoomEvent = useMemo(
+    () => roomEvents.find((e) => e.id === activeRoomEventId) ?? null,
+    [roomEvents, activeRoomEventId]
+  );
+
+  const currentRoomEventsCount = useMemo(
+    () => roomEvents.filter((e) => e.roomName === selectedRoomForEvents).length,
+    [roomEvents, selectedRoomForEvents]
   );
 
   const storeOptions = useMemo(() => {
@@ -183,8 +257,16 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
       })
       .sort((a, b) => {
         if (selectedStore === '全部门店') {
-          const aScore = a.model === 'GZDLS7' ? 0 : a.storeName === '测试一店' ? 1 : 2;
-          const bScore = b.model === 'GZDLS7' ? 0 : b.storeName === '测试一店' ? 1 : 2;
+          const score = (d: DeviceRecord) =>
+            d.model === 'GZDLS7'
+              ? 0
+              : d.model === 'GZIRB56'
+              ? 1
+              : d.storeName === '测试一店'
+              ? 2
+              : 3;
+          const aScore = score(a);
+          const bScore = score(b);
           if (aScore !== bScore) return aScore - bScore;
         }
         return a.sortOrder - b.sortOrder;
@@ -214,12 +296,30 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
                 <ChevronLeft className="w-4 h-4" />
                 返回
               </button>
+            ) : activeGzirb56Device ? (
+              <button
+                type="button"
+                onClick={() => setActiveGzirb56Id(null)}
+                className="inline-flex items-center gap-0.5 text-[13px] font-medium text-white hover:text-emerald-100 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                返回
+              </button>
             ) : eventFormState.open ? (
               <button
                 type="button"
                 onClick={() =>
                   setEventFormState({ open: false, editing: null })
                 }
+                className="inline-flex items-center gap-0.5 text-[13px] font-medium text-white hover:text-emerald-100 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                返回
+              </button>
+            ) : activeRoomEvent ? (
+              <button
+                type="button"
+                onClick={() => setActiveRoomEventId(null)}
                 className="inline-flex items-center gap-0.5 text-[13px] font-medium text-white hover:text-emerald-100 cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -235,31 +335,51 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
           <h1 className="text-[15px] font-semibold tracking-tight truncate text-center">
             {activeGzdls7Device
               ? 'GZDLS7 操作'
+              : activeGzirb56Device
+              ? 'GZIRB56 操作'
               : eventFormState.open
               ? eventFormState.editing
                 ? '编辑区域事件'
                 : '新增区域事件'
+              : activeRoomEvent
+              ? '单个事件操作'
               : appSection === 'events'
               ? '区域事件'
+              : appSection === 'roomEvents'
+              ? '事件管理'
               : '设备列表'}
           </h1>
 
           <div className="w-16 flex items-center justify-end">
-            {!activeGzdls7Device && !eventFormState.open && (
-              <span className="text-[12px] font-mono-tabular text-emerald-100 whitespace-nowrap">
-                {appSection === 'events'
-                  ? `${areaEvents.length}条`
-                  : `${filteredCards.length}台`}
-              </span>
-            )}
+            {!activeGzdls7Device &&
+              !activeGzirb56Device &&
+              !eventFormState.open &&
+              !activeRoomEvent && (
+                <span className="text-[12px] font-mono-tabular text-emerald-100 whitespace-nowrap">
+                  {appSection === 'events'
+                    ? `${areaEvents.length}条`
+                    : appSection === 'roomEvents'
+                    ? `${currentRoomEventsCount}条`
+                    : `${filteredCards.length}台`}
+                </span>
+              )}
           </div>
         </div>
 
-        {/* Subpage: GZDLS7 Controls OR Area Event Form OR Main App Sections */}
+        {/* Subpage: GZDLS7 Controls OR GZIRB56 Controls OR Area Event Form OR Main App Sections */}
         {activeGzdls7Device ? (
           <div className="flex-1 overflow-y-auto">
             <MiniProgramGzdls7View
               device={activeGzdls7Device}
+              onNotify={onNotify}
+            />
+          </div>
+        ) : activeGzirb56Device ? (
+          <div className="flex-1 overflow-y-auto">
+            <MiniProgramGzirb56View
+              device={activeGzirb56Device}
+              config={gzirb56Configs?.[activeGzirb56Device.id]}
+              onUpdateConfig={onUpdateGzirb56Config}
               onNotify={onNotify}
             />
           </div>
@@ -289,6 +409,25 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
                 setEventFormState({ open: true, editing: evt })
               }
               onDeleteEvent={onDeleteAreaEvent}
+            />
+          </div>
+        ) : appSection === 'roomEvents' ? (
+          <div className="flex-1 overflow-y-auto">
+            <MiniProgramRoomEventsView
+              selectedRoom={selectedRoomForEvents}
+              roomOptions={roomEventOptions}
+              events={roomEvents}
+              devices={devices}
+              activeEventId={activeRoomEventId}
+              onSelectEventId={setActiveRoomEventId}
+              onSelectRoom={onSelectRoomForEvents}
+              onRefresh={onRefreshRoomEvents}
+              onInitRoomEvents={onInitRoomEvents}
+              onAddRoomEvent={onAddRoomEvent}
+              onDeleteRoomEvent={onDeleteRoomEvent}
+              onSaveAction={onSaveRoomEventAction}
+              onDeleteAction={onDeleteRoomEventAction}
+              onReorderActions={onReorderRoomEventActions}
             />
           </div>
         ) : (
@@ -564,6 +703,17 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
                             </div>
                           )}
 
+                          {device.testMode === 'gzirb56' && (
+                            <button
+                              type="button"
+                              onClick={() => setActiveGzirb56Id(device.id)}
+                              className="h-7 px-2 inline-flex items-center justify-center gap-1 text-[11px] font-medium text-white bg-[#4B996E] hover:bg-[#3B825B] rounded-md whitespace-nowrap shrink-0 cursor-pointer"
+                            >
+                              <DoorOpen className="w-3 h-3" />
+                              开门下单
+                            </button>
+                          )}
+
                           {device.testMode === 'none' && (
                             <span className="text-[10.5px] text-slate-400 whitespace-nowrap pt-1">
                               音频终端
@@ -601,11 +751,16 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
 
                       {/* Bottom Row: 操作 & 设备信息 */}
                       <div className="pt-2 border-t border-slate-100">
-                        {device.testMode === 'gzdls7' ? (
+                        {device.testMode === 'gzdls7' ||
+                        device.testMode === 'gzirb56' ? (
                           <div className="grid grid-cols-2 gap-1.5">
                             <button
                               type="button"
-                              onClick={() => setActiveGzdls7Id(device.id)}
+                              onClick={() =>
+                                device.testMode === 'gzdls7'
+                                  ? setActiveGzdls7Id(device.id)
+                                  : setActiveGzirb56Id(device.id)
+                              }
                               className="h-7.5 inline-flex items-center justify-center text-[11.5px] font-medium text-[#2F7551] bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-md whitespace-nowrap cursor-pointer"
                             >
                               操作
@@ -666,37 +821,52 @@ export const MiniProgramView: React.FC<MiniProgramViewProps> = ({
         )}
 
         {/* Native App Bottom Tab Bar (Shown on top-level App screens) */}
-        {!activeGzdls7Device && !eventFormState.open && (
-          <nav
-            aria-label="小程序底部导航"
-            className="bg-white border-t border-slate-200 grid grid-cols-2 h-13 shrink-0"
-          >
-            <button
-              type="button"
-              onClick={() => setAppSection('devices')}
-              className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer ${
-                appSection === 'devices'
-                  ? 'text-[#4B996E]'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
+        {!activeGzdls7Device &&
+          !activeGzirb56Device &&
+          !eventFormState.open &&
+          !activeRoomEvent && (
+            <nav
+              aria-label="小程序底部导航"
+              className="bg-white border-t border-slate-200 grid grid-cols-3 h-13 shrink-0"
             >
-              <Cpu className="w-4 h-4" />
-              <span>设备列表</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setAppSection('events')}
-              className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer ${
-                appSection === 'events'
-                  ? 'text-[#4B996E]'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <CalendarClock className="w-4 h-4" />
-              <span>区域事件</span>
-            </button>
-          </nav>
-        )}
+              <button
+                type="button"
+                onClick={() => setAppSection('devices')}
+                className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer ${
+                  appSection === 'devices'
+                    ? 'text-[#4B996E]'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Cpu className="w-4 h-4" />
+                <span>设备列表</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAppSection('events')}
+                className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer ${
+                  appSection === 'events'
+                    ? 'text-[#4B996E]'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <CalendarClock className="w-4 h-4" />
+                <span>区域事件</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAppSection('roomEvents')}
+                className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer ${
+                  appSection === 'roomEvents'
+                    ? 'text-[#4B996E]'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <ListChecks className="w-4 h-4" />
+                <span>事件管理</span>
+              </button>
+            </nav>
+          )}
       </div>
     </div>
   );

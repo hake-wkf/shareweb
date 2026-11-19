@@ -178,6 +178,29 @@ const SEED_DEVICES: DeviceRecord[] = [
     enabled: true,
     roomCategory: '棋牌茶社',
   },
+  {
+    id: 'dev-ktv-1',
+    index: 8,
+    franchisee: '云顶文娱空间',
+    storeName: '测试一店',
+    gatewaySn: '18523d730560',
+    macAddress: '18523D000056A081',
+    model: 'GZIRB56',
+    deviceName: 'KTV智能点歌机',
+    boundRoom: 'A08',
+    status: '在线',
+    purpose: '音响播控',
+    testMode: 'gzirb56',
+    switchState: '开',
+    batteryLevel: null,
+    doorLockId: null,
+    volume: 76,
+    signalStrength: -41,
+    lastSignalQueryTime: '2026-11-18 17:45:00',
+    sortOrder: 8,
+    enabled: true,
+    roomCategory: '台球桌',
+  },
 ];
 
 const EXTRA_TEMPLATES = [
@@ -307,12 +330,26 @@ const EXTRA_TEMPLATES = [
     signalStrength: -42,
     roomCategory: '台球桌',
   },
+  {
+    franchisee: '云顶文娱空间',
+    storeName: '测试八店',
+    gatewaySn: '18523d730560',
+    model: 'GZIRB56',
+    deviceName: '包厢点歌机终端',
+    boundRoom: 'VIP黑八包间',
+    testMode: 'gzirb56' as const,
+    batteryLevel: null,
+    doorLockId: null,
+    volume: 72,
+    signalStrength: -45,
+    roomCategory: '棋牌茶社',
+  },
 ];
 
 export const INITIAL_DEVICES: DeviceRecord[] = (() => {
   const list: DeviceRecord[] = [...SEED_DEVICES];
-  for (let i = 8; i <= 99; i++) {
-    const tpl = EXTRA_TEMPLATES[(i - 8) % EXTRA_TEMPLATES.length];
+  for (let i = 9; i <= 99; i++) {
+    const tpl = EXTRA_TEMPLATES[(i - 9) % EXTRA_TEMPLATES.length];
     const hexSuffix = (0x3000 + i * 17).toString(16).toUpperCase().padStart(6, '0');
     const isOnline = i % 5 !== 0;
     list.push({

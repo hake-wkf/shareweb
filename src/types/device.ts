@@ -1,7 +1,7 @@
 export type DeviceOnlineStatus = '在线' | '离线';
 export type SwitchState = '开' | '关';
 export type DevicePurpose = '普通设备' | '计费设备' | '门禁设备' | '照明控制' | '音响播控';
-export type DeviceTestMode = 'switch' | 'lock' | 'gzdls7' | 'none';
+export type DeviceTestMode = 'switch' | 'lock' | 'gzdls7' | 'gzirb56' | 'none';
 
 export interface DeviceRecord {
   id: string;
@@ -65,7 +65,12 @@ export interface RoomRecord {
   roomStatus: '使用中' | '空闲' | '维护中';
 }
 
-export type WorkspaceTabKey = 'gateways' | 'devices' | 'rooms' | 'events';
+export type WorkspaceTabKey =
+  | 'gateways'
+  | 'devices'
+  | 'rooms'
+  | 'events'
+  | 'roomEvents';
 
 // GZDLS7 specialized types
 export type Gzdls7PanelTab =
@@ -119,6 +124,23 @@ export interface Gzdls7AudioFile {
   uploadedAt: string;
 }
 
+// GZIRB56 (点歌机) specialized types
+export type Gzirb56PanelTab = 'open_order' | 'renew_order' | 'activity';
+
+export interface Gzirb56Config {
+  welcomeText: string;
+  // 续费下单 fixed fields
+  renewalTipMode: '距离当前订单结束时长';
+  renewalQrMode: '绑定包间下单二维码';
+  // 活动内容 fields
+  activityName: string;
+  activityDesc: string;
+  activityTime: string;
+  activityContent: string;
+  activityDiscount: string;
+  discountDesc: string;
+}
+
 // Area Event Management types
 export type AreaEventTriggerType =
   | 'any_order_active'
@@ -135,7 +157,10 @@ export type AreaEventDeviceActionType =
   | 'turn_off'
   | 'unlock'
   | 'lock'
-  | 'set_volume';
+  | 'set_volume'
+  | 'open_order_welcome'
+  | 'renew_order'
+  | 'activity_content';
 
 export type AbIconMatchMode = 'all' | 'specific';
 export type AbTextSourceMode = 'ab_text' | 'custom';
@@ -199,4 +224,29 @@ export interface AreaEventRecord {
   abCommand?: 'ABReport';
   actions: AreaEventActionConfig[];
   updatedAt: string;
+}
+
+// Room Event Management (事件管理: 针对包间的事件列表 & 单个事件设备动作)
+export interface RoomEventDeviceAction {
+  id: string;
+  executionOrder: number;
+  actionType: 'Command' | 'Scene';
+  deviceId: string;
+  deviceSn: string;
+  deviceName: string;
+  deviceModel: string;
+  operation: string;
+  operationLabel: string;
+  params: string;
+  delayMs: number;
+  gzirb56Config?: Gzirb56Config;
+}
+
+export interface RoomEventItem {
+  id: string;
+  roomName: string;
+  eventKey: string;
+  eventName: string;
+  triggerCondition: string;
+  actions: RoomEventDeviceAction[];
 }

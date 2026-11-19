@@ -6,7 +6,11 @@ import {
   DevicePurpose,
   DeviceRecord,
   Gzdls7PanelTab,
+  Gzirb56Config,
+  Gzirb56PanelTab,
   PlatformMode,
+  RoomEventDeviceAction,
+  RoomEventItem,
   WorkspaceTabKey,
 } from './types/device';
 import {
@@ -15,10 +19,16 @@ import {
   INITIAL_ROOMS,
 } from './data/mockDevices';
 import { INITIAL_AREA_EVENTS } from './data/areaEventsData';
+import {
+  createRoomEventsForRoom,
+  INITIAL_ROOM_EVENTS,
+} from './data/roomEventsData';
+import { createInitialGzirb56Config } from './data/gzirb56Data';
 import { FilterBar } from './components/FilterBar';
 import { DeviceTable } from './components/DeviceTable';
 import { DeviceMoreDrawer } from './components/DeviceMoreDrawer';
 import { Gzdls7PanelDrawer } from './components/Gzdls7PanelDrawer';
+import { Gzirb56PanelDrawer } from './components/Gzirb56PanelDrawer';
 import { MiniProgramView } from './components/MiniProgramView';
 import { MiniProgramEditModal } from './components/MiniProgramEditModal';
 import {
@@ -29,6 +39,7 @@ import {
 import { GatewaysView, RoomsView } from './components/GatewayAndRoomViews';
 import { AreaEventsView } from './components/AreaEventsView';
 import { AreaEventModal } from './components/AreaEventModal';
+import { RoomEventsView } from './components/RoomEventsView';
 
 const EMPTY_FILTER: DeviceFilterState = {
   franchisee: '',
@@ -51,6 +62,7 @@ const TABS: { key: WorkspaceTabKey; label: string }[] = [
   { key: 'devices', label: '设备列表' },
   { key: 'rooms', label: '包间列表' },
   { key: 'events', label: '区域事件' },
+  { key: 'roomEvents', label: '事件管理' },
 ];
 
 export default function App() {
@@ -61,6 +73,7 @@ export default function App() {
     'devices',
     'rooms',
     'events',
+    'roomEvents',
   ]);
 
   const [devices, setDevices] = useState<DeviceRecord[]>(INITIAL_DEVICES);
@@ -78,6 +91,13 @@ export default function App() {
     deviceId: string;
     tab: Gzdls7PanelTab;
   } | null>(null);
+  const [gzirb56Drawer, setGzirb56Drawer] = useState<{
+    deviceId: string;
+    tab: Gzirb56PanelTab;
+  } | null>(null);
+  const [gzirb56Configs, setGzirb56Configs] = useState<
+    Record<string, Gzirb56Config>
+  >({});
   const [purposeDevice, setPurposeDevice] = useState<DeviceRecord | null>(null);
   const [commandDevice, setCommandDevice] = useState<DeviceRecord | null>(null);
   const [deleteDevice, setDeleteDevice] = useState<DeviceRecord | null>(null);
@@ -87,6 +107,11 @@ export default function App() {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [editingAreaEvent, setEditingAreaEvent] =
     useState<AreaEventRecord | null>(null);
+
+  const [roomEvents, setRoomEvents] =
+    useState<RoomEventItem[]>(INITIAL_ROOM_EVENTS);
+  const [selectedRoomForEvents, setSelectedRoomForEvents] =
+    useState<string>('A08');
 
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
@@ -184,6 +209,30 @@ export default function App() {
         : null,
     [devices, gzdls7Drawer]
   );
+
+  const gzirb56Device = useMemo(
+    () =>
+      gzirb56Drawer
+        ? devices.find((d) => d.id === gzirb56Drawer.deviceId) ?? null
+        : null,
+    [devices, gzirb56Drawer]
+  );
+
+  const handleUpdateGzirb56Config = (
+    deviceId: string,
+    next: Gzirb56Config
+  ) => {
+    setGzirb56Configs((prev) => ({ ...prev, [deviceId]: next }));
+  };
+
+  const roomEventOptions = useMemo(() => {
+    const set = new Set<string>(['A08']);
+    INITIAL_ROOMS.forEach((r) => set.add(r.roomName));
+    devices.forEach((d) => {
+      if (d.boundRoom) set.add(d.boundRoom);
+    });
+    return Array.from(set);
+  }, [devices]);
 
   const miniProgramEditDevice = useMemo(
     () => devices.find((d) => d.id === miniProgramEditId) ?? null,
@@ -299,6 +348,88 @@ export default function App() {
     });
   };
 
+  // Room Events (事件管理) handlers
+  const handleRefreshRoomEvents = () => {
+    triggerBriefLoad(() => {
+      showToast('包间事件列表已刷新');
+    });
+  };
+
+  const handleInitRoomEvents = (roomName: string) => {
+    const seeded = createRoomEventsForRoom(roomName);
+    setRoomEvents((prev) => [
+      ...prev.filter((e) => e.roomName !== roomName),
+      ...seeded,
+    ]);
+    showToast(`已为包间「${roomName}」初始化标准事件配置`);
+  };
+
+  const handleAddRoomEvent = (payload: {
+    roomName: string;
+    eventKey: string;
+    eventName: string;
+    triggerCondition: string;
+  }) => {
+    const nextItem: RoomEventItem = {
+      id: `re-${Date.now()}`,
+      roomName: payload.roomName,
+      eventKey: payload.eventKey,
+      eventName: payload.eventName,
+      triggerCondition: payload.triggerCondition,
+      actions: [],
+    };
+    setRoomEvents((prev) => [nextItem, ...prev]);
+    showToast(`已新增事件「${payload.eventName}」`);
+  };
+
+  const handleDeleteRoomEvent = (eventId: string) => {
+    const target = roomEvents.find((e) => e.id === eventId);
+    setRoomEvents((prev) => prev.filter((e) => e.id !== eventId));
+    showToast(`已删除事件「${target?.eventName ?? ''}」`);
+  };
+
+  const handleSaveRoomEventAction = (
+    eventId: string,
+    action: RoomEventDeviceAction
+  ) => {
+    setRoomEvents((prev) =>
+      prev.map((evt) => {
+        if (evt.id !== eventId) return evt;
+        const exists = evt.actions.some((a) => a.id === action.id);
+        const nextActions = exists
+          ? evt.actions.map((a) => (a.id === action.id ? action : a))
+          : [...evt.actions, action];
+        return { ...evt, actions: nextActions };
+      })
+    );
+    showToast(
+      `已保存设备操作「${action.deviceName} · ${action.operationLabel}」`
+    );
+  };
+
+  const handleDeleteRoomEventAction = (eventId: string, actionId: string) => {
+    setRoomEvents((prev) =>
+      prev.map((evt) =>
+        evt.id === eventId
+          ? { ...evt, actions: evt.actions.filter((a) => a.id !== actionId) }
+          : evt
+      )
+    );
+    showToast('已删除该设备操作');
+  };
+
+  const handleReorderRoomEventActions = (
+    eventId: string,
+    nextActions: RoomEventDeviceAction[]
+  ) => {
+    setRoomEvents((prev) =>
+      prev.map((evt) =>
+        evt.id === eventId ? { ...evt, actions: nextActions } : evt
+      )
+    );
+    showToast('已更新操作执行顺序');
+  };
+
   const formatNow = () => {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -388,6 +519,18 @@ export default function App() {
       setOpenTabs((prev) => [...prev, 'devices']);
     }
     setActiveTab('devices');
+  };
+
+  const handleManageRoomEvents = (roomName: string) => {
+    setSelectedRoomForEvents(roomName);
+    setRoomEvents((prev) => {
+      if (prev.some((e) => e.roomName === roomName)) return prev;
+      return [...prev, ...createRoomEventsForRoom(roomName)];
+    });
+    if (!openTabs.includes('roomEvents')) {
+      setOpenTabs((prev) => [...prev, 'roomEvents']);
+    }
+    setActiveTab('roomEvents');
   };
 
   const currentTabLabel =
@@ -523,6 +666,19 @@ export default function App() {
             onSaveAreaEvent={handleSaveAreaEvent}
             onDeleteAreaEvent={handleDeleteAreaEvent}
             onRefreshAreaEvents={handleRefreshAreaEvents}
+            gzirb56Configs={gzirb56Configs}
+            onUpdateGzirb56Config={handleUpdateGzirb56Config}
+            roomEvents={roomEvents}
+            roomEventOptions={roomEventOptions}
+            selectedRoomForEvents={selectedRoomForEvents}
+            onSelectRoomForEvents={setSelectedRoomForEvents}
+            onRefreshRoomEvents={handleRefreshRoomEvents}
+            onInitRoomEvents={handleInitRoomEvents}
+            onAddRoomEvent={handleAddRoomEvent}
+            onDeleteRoomEvent={handleDeleteRoomEvent}
+            onSaveRoomEventAction={handleSaveRoomEventAction}
+            onDeleteRoomEventAction={handleDeleteRoomEventAction}
+            onReorderRoomEventActions={handleReorderRoomEventActions}
           />
         ) : (
           <>
@@ -554,6 +710,9 @@ export default function App() {
                   onOpenGzdls7Panel={(d, tab) =>
                     setGzdls7Drawer({ deviceId: d.id, tab })
                   }
+                  onOpenGzirb56Panel={(d, tab) =>
+                    setGzirb56Drawer({ deviceId: d.id, tab })
+                  }
                   onOpenMore={(d) => setMoreDeviceId(d.id)}
                   onRequestDelete={(d) => setDeleteDevice(d)}
                 />
@@ -571,6 +730,7 @@ export default function App() {
               <RoomsView
                 rooms={INITIAL_ROOMS}
                 onFilterDevicesByRoom={handleJumpFromRoom}
+                onManageRoomEvents={handleManageRoomEvents}
               />
             )}
 
@@ -588,6 +748,32 @@ export default function App() {
                   setIsEventModalOpen(true);
                 }}
                 onDeleteEvent={handleDeleteAreaEvent}
+              />
+            )}
+
+            {activeTab === 'roomEvents' && (
+              <RoomEventsView
+                selectedRoom={selectedRoomForEvents}
+                roomOptions={roomEventOptions}
+                events={roomEvents}
+                devices={devices}
+                isRefreshing={isLoading}
+                onSelectRoom={(rm) => {
+                  setSelectedRoomForEvents(rm);
+                  setRoomEvents((prev) =>
+                    prev.some((e) => e.roomName === rm)
+                      ? prev
+                      : [...prev, ...createRoomEventsForRoom(rm)]
+                  );
+                }}
+                onRefresh={handleRefreshRoomEvents}
+                onInitRoomEvents={handleInitRoomEvents}
+                onJumpToAreaEvents={() => setActiveTab('events')}
+                onAddRoomEvent={handleAddRoomEvent}
+                onDeleteRoomEvent={handleDeleteRoomEvent}
+                onSaveAction={handleSaveRoomEventAction}
+                onDeleteAction={handleDeleteRoomEventAction}
+                onReorderActions={handleReorderRoomEventActions}
               />
             )}
           </>
@@ -618,6 +804,20 @@ export default function App() {
         initialTab={gzdls7Drawer?.tab ?? 'personnel'}
         onClose={() => setGzdls7Drawer(null)}
         onSendOpenDoor={(d) => handleDeviceTest(d, '开门')}
+        onNotify={showToast}
+      />
+
+      {/* GZIRB56 Jukebox Test & Control Drawer */}
+      <Gzirb56PanelDrawer
+        device={gzirb56Device}
+        initialTab={gzirb56Drawer?.tab ?? 'open_order'}
+        config={
+          gzirb56Device
+            ? gzirb56Configs[gzirb56Device.id] ?? createInitialGzirb56Config()
+            : undefined
+        }
+        onUpdateConfig={handleUpdateGzirb56Config}
+        onClose={() => setGzirb56Drawer(null)}
         onNotify={showToast}
       />
 

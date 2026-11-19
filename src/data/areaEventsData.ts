@@ -150,6 +150,12 @@ export function formatActionSummary(
       return `${room}-${dev}-播放音频(${action.audioFileName} · ${action.audioVolume}%)`;
     case 'set_volume':
       return `${room}-${dev}-音量${action.deviceVolume ?? 65}%`;
+    case 'open_order_welcome':
+      return `${room}-${dev}-开门下单`;
+    case 'renew_order':
+      return `${room}-${dev}-续费下单`;
+    case 'activity_content':
+      return `${room}-${dev}-活动内容`;
     default:
       return `${room}-${dev}-未配置操作`;
   }

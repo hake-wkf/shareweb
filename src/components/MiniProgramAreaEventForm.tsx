@@ -77,6 +77,13 @@ function getDeviceActionOptions(
       { value: 'play_audio', label: '播放音频（设置音频文件）' },
     ];
   }
+  if (device.model === 'GZIRB56' || device.testMode === 'gzirb56') {
+    return [
+      { value: 'open_order_welcome', label: '开门下单' },
+      { value: 'renew_order', label: '续费下单' },
+      { value: 'activity_content', label: '活动内容' },
+    ];
+  }
   if (device.testMode === 'lock') {
     return [
       { value: 'unlock', label: '开锁' },

@@ -92,11 +92,13 @@ export const GatewaysView: React.FC<GatewaysViewProps> = ({
 interface RoomsViewProps {
   rooms: RoomRecord[];
   onFilterDevicesByRoom: (roomName: string) => void;
+  onManageRoomEvents?: (roomName: string) => void;
 }
 
 export const RoomsView: React.FC<RoomsViewProps> = ({
   rooms,
   onFilterDevicesByRoom,
+  onManageRoomEvents,
 }) => {
   return (
     <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
@@ -158,13 +160,24 @@ export const RoomsView: React.FC<RoomsViewProps> = ({
                   </span>
                 </td>
                 <td className="py-3 px-4 text-center">
-                  <button
-                    type="button"
-                    onClick={() => onFilterDevicesByRoom(rm.roomName)}
-                    className="h-7 px-3 text-[12px] font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors cursor-pointer"
-                  >
-                    查看包厢设备
-                  </button>
+                  <div className="inline-flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onFilterDevicesByRoom(rm.roomName)}
+                      className="h-7 px-3 text-[12px] font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors cursor-pointer"
+                    >
+                      查看包厢设备
+                    </button>
+                    {onManageRoomEvents && (
+                      <button
+                        type="button"
+                        onClick={() => onManageRoomEvents(rm.roomName)}
+                        className="h-7 px-3 text-[12px] font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded transition-colors cursor-pointer"
+                      >
+                        事件管理
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

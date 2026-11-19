@@ -7,15 +7,22 @@ import {
   Clock,
   Copy,
   Cpu,
+  DoorOpen,
   Image as ImageIcon,
   Inbox,
   MoreHorizontal,
+  QrCode,
+  Tag,
   Trash2,
   Type,
   Users,
   Volume2,
 } from 'lucide-react';
-import { DeviceRecord, Gzdls7PanelTab } from '../types/device';
+import {
+  DeviceRecord,
+  Gzdls7PanelTab,
+  Gzirb56PanelTab,
+} from '../types/device';
 
 interface DeviceTableProps {
   devices: DeviceRecord[];
@@ -33,6 +40,7 @@ interface DeviceTableProps {
     action: '开启' | '关闭' | '开锁' | '关锁' | '开门'
   ) => void;
   onOpenGzdls7Panel: (device: DeviceRecord, tab: Gzdls7PanelTab) => void;
+  onOpenGzirb56Panel: (device: DeviceRecord, tab: Gzirb56PanelTab) => void;
   onOpenMore: (device: DeviceRecord) => void;
   onRequestDelete: (device: DeviceRecord) => void;
 }
@@ -50,6 +58,16 @@ const GZDLS7_MENU_ITEMS: {
   { tab: 'audio', label: '设置音频文件', icon: <Volume2 className="w-3.5 h-3.5 text-slate-500" /> },
 ];
 
+const GZIRB56_MENU_ITEMS: {
+  tab: Gzirb56PanelTab;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
+  { tab: 'open_order', label: '开门下单', icon: <DoorOpen className="w-3.5 h-3.5 text-slate-500" /> },
+  { tab: 'renew_order', label: '续费下单', icon: <QrCode className="w-3.5 h-3.5 text-slate-500" /> },
+  { tab: 'activity', label: '活动内容', icon: <Tag className="w-3.5 h-3.5 text-slate-500" /> },
+];
+
 export const DeviceTable: React.FC<DeviceTableProps> = ({
   devices,
   totalCount,
@@ -63,6 +81,7 @@ export const DeviceTable: React.FC<DeviceTableProps> = ({
   onOpenCommand,
   onDeviceTest,
   onOpenGzdls7Panel,
+  onOpenGzirb56Panel,
   onOpenMore,
   onRequestDelete,
 }) => {
@@ -70,6 +89,7 @@ export const DeviceTable: React.FC<DeviceTableProps> = ({
   const [jumpInput, setJumpInput] = useState('');
   const [openMenu, setOpenMenu] = useState<{
     device: DeviceRecord;
+    kind: 'gzdls7' | 'gzirb56';
     top: number;
     left: number;
   } | null>(null);
@@ -355,7 +375,45 @@ export const DeviceTable: React.FC<DeviceTableProps> = ({
                                 window.innerWidth - 168,
                                 Math.max(8, rect.right - 156)
                               );
-                              setOpenMenu({ device: row, top, left });
+                              setOpenMenu({ device: row, kind: 'gzdls7', top, left });
+                            }}
+                            aria-expanded={openMenu?.device.id === row.id}
+                            className="inline-flex items-center gap-1 h-7 px-2.5 text-[12px] font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                          >
+                            更多操作
+                            <ChevronDown className="w-3 h-3 text-slate-500" />
+                          </button>
+                        </div>
+                      )}
+                      {row.testMode === 'gzirb56' && (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onOpenGzirb56Panel(row, 'open_order')}
+                            className="h-7 px-2.5 text-[12px] font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                          >
+                            开门下单
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (openMenu?.device.id === row.id) {
+                                setOpenMenu(null);
+                                return;
+                              }
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const menuHeight = 132;
+                              const spaceBelow = window.innerHeight - rect.bottom;
+                              const top =
+                                spaceBelow < menuHeight
+                                  ? Math.max(8, rect.top - menuHeight - 4)
+                                  : rect.bottom + 4;
+                              const left = Math.min(
+                                window.innerWidth - 156,
+                                Math.max(8, rect.right - 144)
+                              );
+                              setOpenMenu({ device: row, kind: 'gzirb56', top, left });
                             }}
                             aria-expanded={openMenu?.device.id === row.id}
                             className="inline-flex items-center gap-1 h-7 px-2.5 text-[12px] font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded transition-colors whitespace-nowrap shrink-0 cursor-pointer"
@@ -480,7 +538,7 @@ export const DeviceTable: React.FC<DeviceTableProps> = ({
         </div>
       </div>
 
-      {/* Collapsible GZDLS7 "更多操作" Dropdown Menu */}
+      {/* Collapsible GZDLS7 / GZIRB56 "更多操作" Dropdown Menu */}
       {openMenu && (
         <div
           style={{ top: openMenu.top, left: openMenu.left }}
@@ -488,22 +546,39 @@ export const DeviceTable: React.FC<DeviceTableProps> = ({
           className="fixed z-50 w-[156px] bg-white border border-slate-200 rounded-lg shadow-lg py-1"
           role="menu"
         >
-          {GZDLS7_MENU_ITEMS.map((item) => (
-            <button
-              key={item.tab}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                const target = openMenu.device;
-                setOpenMenu(null);
-                onOpenGzdls7Panel(target, item.tab);
-              }}
-              className="w-full px-3 py-2 text-left text-[12.5px] font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors cursor-pointer"
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
-          ))}
+          {openMenu.kind === 'gzdls7'
+            ? GZDLS7_MENU_ITEMS.map((item) => (
+                <button
+                  key={item.tab}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    const target = openMenu.device;
+                    setOpenMenu(null);
+                    onOpenGzdls7Panel(target, item.tab);
+                  }}
+                  className="w-full px-3 py-2 text-left text-[12.5px] font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
+              ))
+            : GZIRB56_MENU_ITEMS.map((item) => (
+                <button
+                  key={item.tab}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    const target = openMenu.device;
+                    setOpenMenu(null);
+                    onOpenGzirb56Panel(target, item.tab);
+                  }}
+                  className="w-full px-3 py-2 text-left text-[12.5px] font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
+              ))}
         </div>
       )}
     </section>
